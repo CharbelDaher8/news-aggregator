@@ -1,0 +1,35 @@
+# Daily refresh — the Linux counterpart to launchd/com.news-aggregator.refresh.plist.
+#
+# Two things in here are load-bearing, and they are the same two facts the plist
+# documents, translated:
+#
+#   1. NEWS_CLAUDE_BIN must point at the real `claude` binary. enrich.py refuses
+#      to resolve it from PATH on purpose (a `claude` on PATH is often an alias
+#      or a shim). PATH is set anyway because an npm-installed claude is a Node
+#      script with a `#!/usr/bin/env node` shebang and dies without node on PATH;
+#      the native build (`claude install`) is self-contained and does not care.
+#
+#   2. HOME must be the home of the user that authenticated. macOS reads the
+#      OAuth token from the login keychain; Linux reads ~/.claude/.credentials.json.
+#      systemd does NOT set HOME from User= for system services, so leaving it
+#      unset means `claude -p` starts unauthenticated and the run fails.
+#
+# Substitute __DIR__ / __USER__ / __CLAUDE_BIN__ before installing — see DEPLOY.md.
+
+[Unit]
+Description=news-aggregator daily refresh (fetch + LLM scoring)
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=oneshot
+User=__USER__
+WorkingDirectory=__DIR__
+Environment=HOME=/home/__USER__
+Environment=NEWS_CLAUDE_BIN=__CLAUDE_BIN__
+Environment=PATH=/usr/local/bin:/usr/bin:/bin
+ExecStart=__DIR__/news refresh
+
+# A refresh is ~5 minutes of fetching plus two claude -p calls. The timeout is
+# generous rather than tight: killing it halfway leaves a partial run recorded.
+TimeoutStartSec=1800

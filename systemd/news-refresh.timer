@@ -1,0 +1,18 @@
+# Fires news-refresh.service at 07:00 daily.
+#
+# Persistent=true is the one deliberate difference from the plist, which sets
+# RunAtLoad=false so that loading the agent never kicks off a five-minute LLM
+# run. Here the equivalent risk is a reboot: with Persistent=true, a 07:00 run
+# missed while the box was down runs shortly after it comes back. For a daily
+# digest that is what you want — you want today's news, not a hole. Set it to
+# false if you would rather a missed day stay missed.
+
+[Unit]
+Description=Run news-aggregator refresh daily at 07:00
+
+[Timer]
+OnCalendar=*-*-* 07:00:00
+Persistent=true
+
+[Install]
+WantedBy=timers.target

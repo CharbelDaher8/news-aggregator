@@ -1,0 +1,33 @@
+# The always-on web reader.
+#
+# --host 127.0.0.1 is a security boundary, not a default worth overriding. The
+# reader has no authentication of its own and `r` triggers a fetch + LLM run
+# against your Claude subscription, so the only thing that should be able to
+# reach this port is the tunnel client running on the same box. Binding to
+# 0.0.0.0 hands the feed — and your quota — to anyone who can route to the VPS,
+# and it also creates a path that bypasses whatever auth the tunnel enforces.
+#
+# No NEWS_CLAUDE_BIN here on purpose: `read`/`web` never invoke claude. Only
+# `refresh` does, and pressing `r` in the reader shells out to a fresh process.
+#
+# Substitute __DIR__ / __USER__ before installing — see DEPLOY.md.
+
+[Unit]
+Description=news-aggregator web reader (textual-serve)
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+User=__USER__
+WorkingDirectory=__DIR__
+Environment=HOME=/home/__USER__
+ExecStart=__DIR__/news web --host 127.0.0.1 --port 8000
+
+# textual-serve spawns one NewsApp subprocess per visitor; a crash in the server
+# should not take the feed offline until someone notices.
+Restart=always
+RestartSec=5
+
+[Install]
+WantedBy=multi-user.target

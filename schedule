@@ -1,0 +1,39 @@
+#!/bin/bash
+# schedule — install / remove the daily refresh LaunchAgent.
+set -euo pipefail
+
+here="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+label="com.news-aggregator.refresh"
+target="$HOME/Library/LaunchAgents/$label.plist"
+src="$here/launchd/$label.plist"
+
+case "${1:-}" in
+install)
+    mkdir -p "$HOME/Library/LaunchAgents" "$here/data"
+    # __DIR__ is substituted rather than hardcoded so the repo stays portable.
+    sed "s|__DIR__|$here|g" "$src" > "$target"
+    # bootout first so re-installing picks up changes instead of failing.
+    launchctl bootout "gui/$UID/$label" 2>/dev/null || true
+    launchctl bootstrap "gui/$UID" "$target"
+    echo "installed: daily refresh at 07:00"
+    echo "  status:  launchctl print gui/$UID/$label | head -20"
+    echo "  log:     tail -f $here/data/refresh.log"
+    echo "  run now: launchctl kickstart -p gui/$UID/$label"
+    ;;
+uninstall)
+    launchctl bootout "gui/$UID/$label" 2>/dev/null || true
+    rm -f "$target"
+    echo "removed"
+    ;;
+status)
+    if launchctl print "gui/$UID/$label" >/dev/null 2>&1; then
+        launchctl print "gui/$UID/$label" | grep -E 'state|last exit|runs' || true
+    else
+        echo "not installed"
+    fi
+    ;;
+*)
+    echo "usage: ./schedule {install|uninstall|status}" >&2
+    exit 1
+    ;;
+esac

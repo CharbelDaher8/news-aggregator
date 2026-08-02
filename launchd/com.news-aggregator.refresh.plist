@@ -1,0 +1,58 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!--
+  Daily refresh at 07:00.
+
+  Install:  ./schedule install
+  Remove:   ./schedule uninstall
+
+  Two things in here are load-bearing and were verified by testing, not assumed:
+
+  1. PATH must include /opt/homebrew/bin. The `claude` CLI is a Node script with
+     a `#!/usr/bin/env node` shebang; launchd's default PATH has no node, and the
+     job dies with "env: node: No such file or directory" before it ever
+     authenticates.
+
+  2. A LaunchAgent (this file, in ~/Library/LaunchAgents) CAN read the OAuth
+     token from the login keychain, so `claude -p` authenticates with no API key.
+     A system-wide LaunchDaemon runs outside the user's session and cannot.
+
+  RunAtLoad is false on purpose: loading the agent should not kick off a
+  five-minute LLM run. Use `./news refresh` for that.
+-->
+<plist version="1.0">
+<dict>
+    <key>Label</key>
+    <string>com.news-aggregator.refresh</string>
+
+    <key>ProgramArguments</key>
+    <array>
+        <string>__DIR__/news</string>
+        <string>refresh</string>
+    </array>
+
+    <key>WorkingDirectory</key>
+    <string>__DIR__</string>
+
+    <key>EnvironmentVariables</key>
+    <dict>
+        <key>PATH</key>
+        <string>/opt/homebrew/bin:/usr/local/bin:/usr/bin:/bin:/usr/sbin:/sbin</string>
+    </dict>
+
+    <key>StartCalendarInterval</key>
+    <dict>
+        <key>Hour</key>
+        <integer>7</integer>
+        <key>Minute</key>
+        <integer>0</integer>
+    </dict>
+
+    <key>RunAtLoad</key>
+    <false/>
+
+    <key>StandardOutPath</key>
+    <string>__DIR__/data/refresh.log</string>
+    <key>StandardErrorPath</key>
+    <string>__DIR__/data/refresh.err.log</string>
+</dict>
+</plist>

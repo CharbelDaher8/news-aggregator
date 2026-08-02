@@ -1,0 +1,23 @@
+#!/bin/bash
+# news — tech/AI/security aggregator
+#
+# Resolves its own location so it works from anywhere, via symlink, and from
+# launchd (which provides no useful cwd and a minimal PATH).
+set -euo pipefail
+
+here="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+py="$here/.venv/bin/python"
+
+if [[ ! -x "$py" ]]; then
+  echo "news: missing venv at $py" >&2
+  echo "create it with: /opt/homebrew/bin/python3.13 -m venv .venv && .venv/bin/pip install textual httpx" >&2
+  exit 1
+fi
+
+# Bare `news` opens the reader; that is the common case.
+if [[ $# -eq 0 ]]; then
+  exec "$py" -m agg.cli read
+fi
+
+cd "$here"
+exec "$py" -m agg.cli "$@"
