@@ -182,5 +182,54 @@ check("converts duration to seconds", u.duration_s, 1.5)
 check("survives a usage block with missing keys",
       Usage("haiku").add({"_usage": {}}) or True, True)
 
+# --- the JSON API ------------------------------------------------------------
+#
+# The wire shape, not the HTTP. Whether a socket accepts a connection is not
+# where this breaks; what breaks is a field quietly renamed or dropped, because
+# the reader on the other side is in another language and another repository and
+# finds out at runtime.
+
+import sqlite3  # noqa: E402
+from agg.api import _flag, _int, item_json  # noqa: E402
+
+_row = sqlite3.connect(":memory:")
+_row.row_factory = sqlite3.Row
+_row.execute("CREATE TABLE t (id TEXT, url TEXT, title TEXT, source_name TEXT, "
+             "source_key TEXT, category TEXT, llm_category TEXT, author TEXT, "
+             "published REAL, first_seen REAL, signal REAL, signal_label TEXT, "
+             "summary TEXT, llm_score INTEGER, is_top INTEGER, top_reason TEXT, "
+             "read_at REAL, saved INTEGER)")
+_row.execute("INSERT INTO t VALUES ('abc','http://x','T','HN','hn','tech','ai',"
+             "'me',1.0,2.0,42.0,'42 pts','sum',88,1,'why',NULL,1)")
+sample = _row.execute("SELECT * FROM t").fetchone()
+wire = item_json(sample)
+
+check("publishes the fields the client reads",
+      set(wire) >= {"id", "url", "title", "source", "category", "summary",
+                    "score", "read", "saved", "isTop"}, True)
+check("prefers the LLM's category over the fetcher's", wire["category"], "ai")
+check("reports read as a boolean, not a timestamp", wire["read"], False)
+check("reports saved as a boolean", wire["saved"], True)
+check("reports the LLM score it was given", wire["score"], 88)
+
+# "not scored yet" and "scored zero" are different states and the client renders
+# them differently, so null has to survive the trip as null.
+_row.execute("INSERT INTO t VALUES ('def','http://y','U','Lobsters','lob','tech',"
+             "NULL,NULL,NULL,3.0,0.0,'',NULL,NULL,0,NULL,NULL,0)")
+unscored = item_json(_row.execute("SELECT * FROM t WHERE id='def'").fetchone())
+check("keeps an unscored item's score null rather than zero", unscored["score"], None)
+check("falls back to the fetcher's category when the LLM has not run",
+      unscored["category"], "tech")
+check("has no summary before the LLM pass", unscored["summary"], None)
+# `extra` is a private arrangement between fetch.py and the reader; publishing
+# it would make a source's internal blob part of an external contract.
+check("does not publish the source-specific blob", "extra" in wire, False)
+
+check("clamps a limit above the ceiling", _int({"limit": ["9999"]}, "limit", 100, 1, 500), 500)
+check("falls back on a non-numeric limit", _int({"limit": ["all"]}, "limit", 100, 1, 500), 100)
+check("reads a flag as set", _flag({"unread": ["1"]}, "unread"), True)
+check("treats an absent flag as unset", _flag({}, "unread"), False)
+check("treats an explicit false as unset", _flag({"unread": ["false"]}, "unread"), False)
+
 print(f"\n{PASS} passed, {FAIL} failed")
 sys.exit(1 if FAIL else 0)

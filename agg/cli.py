@@ -121,6 +121,28 @@ def cmd_web(args: argparse.Namespace) -> int:
     return 0
 
 
+def cmd_api(args: argparse.Namespace) -> int:
+    """Serve the ranked feed as JSON, for vim-notes to read.
+
+    Not a second reader: it is `store.feed()` and `store.diversify()` — the same
+    ranking the TUI shows — rendered as JSON instead of as a terminal. See
+    agg/api.py for why this is an endpoint rather than the other application
+    opening items.db itself.
+    """
+    from .api import serve
+
+    if args.host not in ("localhost", "127.0.0.1"):
+        # Same warning `web` gives, and for the same reason: there is no auth
+        # here either, and this one can mark things read.
+        print(f"{YELLOW}!{RESET} serving on {args.host} — anyone who can reach "
+              f"this port can read your feed and mark it read")
+
+    print(f"{BOLD}news api{RESET} on {CYAN}http://{args.host}:{args.port}{RESET} "
+          f"{DIM}— ctrl-c to stop{RESET}")
+    serve(host=args.host, port=args.port)
+    return 0
+
+
 def _k(n: float) -> str:
     """Compact token count: 1234 -> 1.2k, 1234567 -> 1.23M."""
     if n >= 1_000_000:
@@ -317,6 +339,12 @@ def main(argv: list[str] | None = None) -> int:
                    help="0.0.0.0 to expose on the LAN (unauthenticated)")
     w.add_argument("--port", type=int, default=8000)
     w.set_defaults(func=cmd_web)
+
+    a = sub.add_parser("api", help="serve the feed as JSON for another app")
+    a.add_argument("--host", default="127.0.0.1",
+                   help="0.0.0.0 to expose to a container network (unauthenticated)")
+    a.add_argument("--port", type=int, default=8787)
+    a.set_defaults(func=cmd_api)
 
     us = sub.add_parser("usage", help="token spend per run and cumulative")
     us.add_argument("-n", "--limit", type=int, default=20,

@@ -43,6 +43,25 @@ it and just read.
 ./schedule status
 ```
 
+## The JSON API
+
+`./news api` serves the same ranked feed as JSON, for another application to
+read. It exists so vim-notes can show the feed without reimplementing
+`store.feed()` and `store.diversify()` in TypeScript — the ranking, and the
+rule that stops a KEV day burying everything under fifteen CVEs, stay here.
+
+```
+GET  /health                      counts, and when the last run was
+GET  /feed?category=&unread=1&days=7&saved=1&limit=100
+POST /items/<id>/read             {"read": true|false}
+POST /items/<id>/saved            toggles, returns the new state
+```
+
+There is **no authentication**, the same as `news web`. It binds loopback
+unless told otherwise, and in the vim-notes compose stack it runs on a private
+network with no published port, reachable only by the notes server beside it.
+Anything that can reach it can read your feed and mark it read.
+
 ## How ranking works
 
 Two stages. A deterministic `base_score` from popularity signal × source weight ×
